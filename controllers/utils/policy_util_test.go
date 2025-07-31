@@ -329,10 +329,6 @@ func TestInspectPolicyObjects(t *testing.T) {
 
 	// Debug: Print the parsed object structure
 	t.Logf("Parsed policy object: %+v", policyObj)
-	if policyObj["spec"] == nil {
-		t.Logf("WARNING: spec is nil in parsed object")
-		t.Logf("Available keys: %v", getKeys(policyObj))
-	}
 
 	policy := &unstructured.Unstructured{Object: policyObj}
 
@@ -346,13 +342,4 @@ func TestInspectPolicyObjects(t *testing.T) {
 	}
 	assert.NoError(t, err)
 	assert.False(t, containsStatus, "Policy should not contain status")
-}
-
-// Helper function to get keys from a map
-func getKeys(m map[string]interface{}) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return keys
 }
