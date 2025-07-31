@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -8,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/yaml"
 )
 
 func TestGetParentPolicyNameAndNamespace(t *testing.T) {
@@ -293,4 +295,64 @@ func TestStripObjectTemplatesRaw(t *testing.T) {
 			assert.Equal(t, trimmedActual, trimmedExpected)
 		})
 	}
+}
+
+func TestInspectPolicyObjects(t *testing.T) {
+	// Read the policy YAML from the file
+	data, err := os.ReadFile("extra-manifests-policy.yaml")
+	if err != nil {
+		t.Fatalf("Failed to read policy file: %v", err)
+	}
+
+	// Debug: Print the raw file content
+	t.Logf("Raw file content:\n%s", string(data))
+
+	// Extract just the Policy part (before the first --- separator)
+	lines := strings.Split(string(data), "\n")
+	var policyLines []string
+	for i, line := range lines {
+		if strings.TrimSpace(line) == "---" {
+			t.Logf("Found separator at line %d", i)
+			break
+		}
+		policyLines = append(policyLines, line)
+	}
+	policyYAML := strings.Join(policyLines, "\n")
+
+	// Debug: Print the extracted YAML
+	t.Logf("Extracted YAML:\n%s", policyYAML)
+
+	// Parse the YAML into an unstructured object
+	var policyObj map[string]interface{}
+	err = yaml.Unmarshal([]byte(policyYAML), &policyObj)
+	assert.NoError(t, err)
+
+	// Debug: Print the parsed object structure
+	t.Logf("Parsed policy object: %+v", policyObj)
+	if policyObj["spec"] == nil {
+		t.Logf("WARNING: spec is nil in parsed object")
+		t.Logf("Available keys: %v", getKeys(policyObj))
+	}
+
+	policy := &unstructured.Unstructured{Object: policyObj}
+
+	// Call the function under test
+	containsStatus, err := InspectPolicyObjects(policy)
+
+	// Check the results
+	if err != nil {
+		t.Logf("Policy validation failed: %v", err)
+		t.Logf("Policy YAML:\n%s", policyYAML)
+	}
+	assert.NoError(t, err)
+	assert.False(t, containsStatus, "Policy should not contain status")
+}
+
+// Helper function to get keys from a map
+func getKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
